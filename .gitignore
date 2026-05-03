@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+bin/
+games/
+conf/
+.DS_Store
