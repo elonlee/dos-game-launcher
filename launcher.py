@@ -68,7 +68,7 @@ cd {game_dir_name}
 
 """
     if autoexec_re.search(template):
-        config = autoexec_re.sub(new_autoexec, template)
+        config = autoexec_re.sub(lambda _m: new_autoexec, template)
     else:
         config = template + "\n" + new_autoexec
     conf_path.write_text(config, encoding="utf-8")
@@ -88,7 +88,7 @@ cd {game_dir_name}
 
 """
     if autoexec_re.search(template):
-        config = autoexec_re.sub(new_autoexec, template)
+        config = autoexec_re.sub(lambda _m: new_autoexec, template)
     else:
         config = template + "\n" + new_autoexec
     fd, tmp_path = tempfile.mkstemp(suffix=".conf", prefix="dos_shell_")

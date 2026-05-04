@@ -183,7 +183,7 @@ cd {game_dir_name}
 """
 
     if autoexec_re.search(template):
-        config = autoexec_re.sub(new_autoexec, template)
+        config = autoexec_re.sub(lambda _m: new_autoexec, template)
     else:
         config = template + "\n" + new_autoexec
 

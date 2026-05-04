@@ -32,7 +32,7 @@
 
 - Python 3.9+
 - [dosbox-x](https://dosbox-x.com/)（已安装并可用）
-
+- 在windows下需要额外安装 python -m pip install windows-curses
 ### 2. 初始化游戏库
 
 ```bash
