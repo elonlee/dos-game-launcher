@@ -4,7 +4,6 @@ Extract DOS game ZIPs to English-named directories,
 detect main executables, and generate per-game dosbox-x configs.
 """
 
-import json
 import os
 import re
 import subprocess
@@ -13,11 +12,12 @@ import zipfile
 from pathlib import Path
 from typing import Optional
 
+import db
+
 BASE_DIR = Path(__file__).resolve().parent
 BIN_DIR = BASE_DIR / "bin"
 GAMES_DIR = BASE_DIR / "games"
 CONF_DIR = BASE_DIR / "conf"
-MAPPING_FILE = GAMES_DIR / "mapping.json"
 TEMPLATE_CONF = BASE_DIR / "dosbox-x.conf"
 
 # Known runtime/setup executables to exclude from auto-detection
@@ -215,7 +215,15 @@ def main():
 
     GAMES_DIR.mkdir(exist_ok=True)
     CONF_DIR.mkdir(exist_ok=True)
+    db.init_db()
 
+    # auto-import games.json if database is empty
+    games_json = BASE_DIR / "games.json"
+    if games_json.exists() and db.get_game_count() == 0:
+        print("Importing games.json into SQLite...")
+        db.import_games_json(games_json)
+
+    old_mapping = db.get_mapping()
     mapping = {}
     used_slugs = set()
 
@@ -224,6 +232,12 @@ def main():
     for name, info in existing.items():
         mapping[name] = info
         used_slugs.add(info["dir"])
+
+        # Prefer executable from games table if matched by zh-Hans name
+        game = db.get_game_by_zh_hans(name)
+        if game and game.get('executable'):
+            info['exe'] = game['executable']
+
         print(f"[EXISTING] {name} -> {info['dir']} (exe: {info['exe']})")
 
     # Process ZIP files
@@ -266,11 +280,25 @@ def main():
         else:
             print(f"  WARNING: Could not detect main executable")
 
-        mapping[original_name] = {
+        info = {
             "dir": slug,
             "exe": exe,
             "favorite": False
         }
+
+        # Prefer executable from games table if matched by zh-Hans name
+        game = db.get_game_by_zh_hans(original_name)
+        if game and game.get('executable'):
+            info['exe'] = game['executable']
+
+        # Preserve user modifications from old mapping
+        if original_name in old_mapping:
+            old = old_mapping[original_name]
+            info["favorite"] = old.get("favorite", False)
+            if old.get("exe"):
+                info["exe"] = old["exe"]
+
+        mapping[original_name] = info
 
     # Generate configs
     print(f"\nGenerating configs in {CONF_DIR}...")
@@ -281,9 +309,29 @@ def main():
         generate_config(info["dir"], info["exe"], conf_path)
         info["config"] = str(conf_path.relative_to(BASE_DIR))
 
-    # Write mapping
-    MAPPING_FILE.write_text(json.dumps(mapping, ensure_ascii=False, indent=2), encoding='utf-8')
-    print(f"\nMapping saved to {MAPPING_FILE}")
+    # Delete stale mapping entries whose game directory no longer exists
+    to_delete = []
+    for name, info in old_mapping.items():
+        if name in mapping:
+            continue
+        dir_name = info.get("dir")
+        if not dir_name:
+            to_delete.append(name)
+            continue
+        if info.get("source") == "existing_dir":
+            if not (BASE_DIR / dir_name).is_dir():
+                to_delete.append(name)
+        else:
+            if dir_name not in used_slugs:
+                to_delete.append(name)
+
+    if to_delete:
+        db.delete_mapping_entries(to_delete)
+        print(f"\nRemoved {len(to_delete)} stale mapping entries")
+
+    # Save/update mapping entries
+    db.upsert_mapping_entries(mapping)
+    print(f"\nMapping saved to database")
     print(f"Total games: {len(mapping)}")
     print(f"Games with detected exe: {sum(1 for v in mapping.values() if v.get('exe'))}")
 

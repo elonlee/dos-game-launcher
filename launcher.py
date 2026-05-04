@@ -5,7 +5,6 @@ Supports multi-column display, exe editing, shell mode, and favorites.
 """
 
 import curses
-import json
 import math
 import os
 import re
@@ -14,8 +13,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+import db
+
 BASE_DIR = Path(__file__).resolve().parent
-MAPPING_FILE = BASE_DIR / "games" / "mapping.json"
 CONF_DIR = BASE_DIR / "conf"
 TEMPLATE_CONF = BASE_DIR / "dosbox-x.conf"
 GAMES_DIR = BASE_DIR / "games"
@@ -25,8 +25,7 @@ COLOR_STAR = 1
 
 
 def load_games():
-    with open(MAPPING_FILE, "r", encoding="utf-8") as f:
-        mapping = json.load(f)
+    mapping = db.get_mapping()
     games = []
     for name, info in mapping.items():
         if info.get("error"):
@@ -43,14 +42,7 @@ def load_games():
 
 
 def save_mapping(games):
-    with open(MAPPING_FILE, "r", encoding="utf-8") as f:
-        mapping = json.load(f)
-    for g in games:
-        if g["name"] in mapping:
-            mapping[g["name"]]["exe"] = g["exe"]
-            mapping[g["name"]]["favorite"] = g["favorite"]
-    with open(MAPPING_FILE, "w", encoding="utf-8") as f:
-        json.dump(mapping, f, ensure_ascii=False, indent=2)
+    db.update_mapping_entries(games)
 
 
 def generate_config(game_dir_name: str, exe_path: str, conf_path: Path) -> None:
@@ -261,11 +253,11 @@ def main(stdscr):
             curses.init_pair(COLOR_STAR, curses.COLOR_RED, curses.COLOR_BLACK)
 
     try:
+        db.init_db()
         all_games = load_games()
-    except FileNotFoundError:
+    except Exception:
         stdscr.clear()
-        stdscr.addstr(0, 0, f"Mapping file not found: {MAPPING_FILE}")
-        stdscr.addstr(1, 0, "Please run setup_games.py first.")
+        stdscr.addstr(0, 0, "Database not initialized. Please run setup_games.py first.")
         stdscr.refresh()
         stdscr.getch()
         return
