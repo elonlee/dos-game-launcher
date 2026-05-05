@@ -1,0 +1,9 @@
+[project]
+name = "dos-game-launcher"
+version = "0.1.0"
+description = "dos-game-launcher"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pypinyin>=0.50",
+]

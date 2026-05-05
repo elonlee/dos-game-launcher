@@ -57,6 +57,7 @@ mount c {GAMES_DIR}
 c:
 cd {game_dir_name}
 {exe_path}
+exit
 
 """
     if autoexec_re.search(template):
@@ -126,7 +127,7 @@ def edit_exe(stdscr, game):
         if key in (curses.KEY_ENTER, 10, 13):
             new_exe = "".join(buf).strip()
             game["exe"] = new_exe
-            conf_path = CONF_DIR / f"{game['dir']}.conf"
+            conf_path = CONF_DIR / f"{game['name']}.conf"
             generate_config(game["dir"], new_exe, conf_path)
             curses.curs_set(0)
             return True

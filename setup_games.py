@@ -6,11 +6,11 @@ detect main executables, and generate per-game dosbox-x configs.
 
 import os
 import re
-import subprocess
-import sys
 import zipfile
 from pathlib import Path
 from typing import Optional
+
+import pypinyin
 
 import db
 
@@ -64,23 +64,12 @@ EXCLUDED_EXES = {
 }
 
 
-def ensure_pypinyin():
-    try:
-        import pypinyin
-        return pypinyin
-    except ImportError:
-        print("pypinyin not found, installing...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pypinyin", "-q"])
-        import pypinyin
-        return pypinyin
-
-
-def to_pinyin_slug(name: str, pypinyin_mod) -> str:
+def to_pinyin_slug(name: str) -> str:
     """Convert Chinese game name to a safe English directory name."""
     # Remove .zip extension
     base = re.sub(r'\.zip$', '', name, flags=re.IGNORECASE)
     # Convert to pinyin
-    py = pypinyin_mod.lazy_pinyin(base)
+    py = pypinyin.lazy_pinyin(base)
     slug = '_'.join(py)
     # Remove/replace unsafe chars
     slug = re.sub(r'[^\w\s-]', '', slug)
@@ -179,6 +168,7 @@ mount c {GAMES_DIR}
 c:
 cd {game_dir_name}
 {exe_path}
+exit
 
 """
 
@@ -196,7 +186,7 @@ def scan_existing_dirs() -> dict:
     for item in BASE_DIR.iterdir():
         if not item.is_dir():
             continue
-        if item.name in ('bin', 'games', 'conf', '.claude'):
+        if item.name in ('bin', 'games', 'conf', '.claude', '.venv', '.git'):
             continue
         # Heuristic: if it has DOS game files, treat it as a game
         exe = find_main_executable(item)
@@ -211,8 +201,6 @@ def scan_existing_dirs() -> dict:
 
 
 def main():
-    pypinyin_mod = ensure_pypinyin()
-
     GAMES_DIR.mkdir(exist_ok=True)
     CONF_DIR.mkdir(exist_ok=True)
     db.init_db()
@@ -246,7 +234,7 @@ def main():
 
     for zip_path in zips:
         original_name = zip_path.stem  # name without .zip
-        slug = to_pinyin_slug(original_name, pypinyin_mod)
+        slug = to_pinyin_slug(original_name)
 
         # Handle collisions
         base_slug = slug
@@ -305,7 +293,7 @@ def main():
     for original_name, info in mapping.items():
         if info.get("error") or not info.get("exe"):
             continue
-        conf_path = CONF_DIR / f"{info['dir']}.conf"
+        conf_path = CONF_DIR / f"{original_name}.conf"
         generate_config(info["dir"], info["exe"], conf_path)
         info["config"] = str(conf_path.relative_to(BASE_DIR))
 
