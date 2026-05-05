@@ -7,7 +7,6 @@ Supports multi-column display, exe editing, shell mode, and favorites.
 import curses
 import math
 import os
-import re
 import subprocess
 import sys
 import tempfile
@@ -46,61 +45,46 @@ def save_mapping(games):
 
 
 def generate_config(game_dir_name: str, exe_path: str, conf_path: Path) -> None:
-    """Generate a dosbox-x config based on the template."""
-    if not TEMPLATE_CONF.exists():
-        return
-    template = TEMPLATE_CONF.read_text(encoding="utf-8")
-    autoexec_re = re.compile(r"^\[autoexec\].*?(?=^\[|\Z)", re.MULTILINE | re.DOTALL)
-    new_autoexec = f"""[autoexec]
+    """Generate a minimal game-specific dosbox-x config with only [autoexec]."""
+    content = f"""[autoexec]
 # Auto-generated for {game_dir_name}
 mount c {GAMES_DIR}
 c:
 cd {game_dir_name}
-{exe_path}
+call {exe_path}
 exit
-
 """
-    if autoexec_re.search(template):
-        config = autoexec_re.sub(lambda _m: new_autoexec, template)
-    else:
-        config = template + "\n" + new_autoexec
-    conf_path.write_text(config, encoding="utf-8")
+    conf_path.write_text(content, encoding="utf-8")
 
 
 def generate_shell_config(game_dir_name: str) -> Path:
     """Generate a temporary config that opens a shell in the game directory."""
-    if not TEMPLATE_CONF.exists():
-        return None
-    template = TEMPLATE_CONF.read_text(encoding="utf-8")
-    autoexec_re = re.compile(r"^\[autoexec\].*?(?=^\[|\Z)", re.MULTILINE | re.DOTALL)
-    new_autoexec = f"""[autoexec]
+    content = f"""[autoexec]
 # Shell mode for {game_dir_name}
 mount c {GAMES_DIR}
 c:
 cd {game_dir_name}
-
 """
-    if autoexec_re.search(template):
-        config = autoexec_re.sub(lambda _m: new_autoexec, template)
-    else:
-        config = template + "\n" + new_autoexec
     fd, tmp_path = tempfile.mkstemp(suffix=".conf", prefix="dos_shell_")
-    os.write(fd, config.encode("utf-8"))
+    os.write(fd, content.encode("utf-8"))
     os.close(fd)
     return Path(tmp_path)
 
 
 def launch_game(game, shell_mode=False):
+    cmd = ["dosbox-x"]
+    if TEMPLATE_CONF.exists():
+        cmd += ["-conf", str(TEMPLATE_CONF)]
     if shell_mode:
         tmp_conf = generate_shell_config(game["dir"])
         if not tmp_conf:
             return
-        cmd = ["dosbox-x", "-conf", str(tmp_conf)]
+        cmd += ["-conf", str(tmp_conf)]
     else:
         config_path = BASE_DIR / game["config"]
         if not config_path.exists():
             return
-        cmd = ["dosbox-x", "-conf", str(config_path)]
+        cmd += ["-conf", str(config_path)]
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 

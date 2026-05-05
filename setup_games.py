@@ -153,31 +153,16 @@ def extract_zip(zip_path: Path, target_dir: Path) -> bool:
 
 
 def generate_config(game_dir_name: str, exe_path: str, conf_path: Path) -> None:
-    """Generate a dosbox-x config based on the template."""
-    if not TEMPLATE_CONF.exists():
-        print(f"  WARNING: Template config not found at {TEMPLATE_CONF}")
-        return
-
-    template = TEMPLATE_CONF.read_text(encoding='utf-8')
-
-    # Replace [autoexec] section
-    autoexec_re = re.compile(r'^\[autoexec\].*?(?=^\[|\Z)', re.MULTILINE | re.DOTALL)
-    new_autoexec = f"""[autoexec]
+    """Generate a minimal game-specific dosbox-x config with only [autoexec]."""
+    content = f"""[autoexec]
 # Auto-generated for {game_dir_name}
 mount c {GAMES_DIR}
 c:
 cd {game_dir_name}
-{exe_path}
+call {exe_path}
 exit
-
 """
-
-    if autoexec_re.search(template):
-        config = autoexec_re.sub(lambda _m: new_autoexec, template)
-    else:
-        config = template + "\n" + new_autoexec
-
-    conf_path.write_text(config, encoding='utf-8')
+    conf_path.write_text(content, encoding='utf-8')
 
 
 def scan_existing_dirs() -> dict:
